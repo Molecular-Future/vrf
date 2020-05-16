@@ -1,0 +1,294 @@
+syntax = "proto3";
+
+package org.mos.bcrand.model;
+
+enum PModule {
+	VRF = 0;
+};
+enum PCommand {
+	JIN = 0; //申请加入节点集群,follow up
+	INF = 1; //获取当前网络信息
+
+	CBN = 2; //发送coinbase,new
+
+	CBW = 3; //发送coinbase,witness; PSCoinbaseWitness
+
+	CBR = 4; //发送coinbase,reply
+
+	SYN = 5; //同步block
+
+	VFY = 6; //块校验
+
+	BRT = 8; //同步交易
+
+	SRT = 9; //同步单笔交易, applyBlock时,如果交易没有同步, 需要批量同步交易
+
+	SOS = 10;//节点退出
+	RHR = 31;//给运维使用的心跳
+
+	VNI = 32; // 查看节点信息
+	SCK = 33; // 同步chainKey
+};
+
+message SyncChainKey {
+	string tmpPubKey = 1;
+	string signature = 2;
+	int64 timestamp = 3;
+}
+message RespSyncChainKey {
+	string encChainKey = 1;
+}
+
+enum VNodeState{
+	VN_INIT = 0;		//初始化状态
+	VN_SYNC_BLOCK = 1;	//同步块
+	VN_BAKCUP = 2;		//备用节点, 不参与打块
+	VN_DUTY_BLOCKMAKERS = 4; 	//轮值节点
+	VN_DUTY_NOTARY = 5; //
+	VN_DUTY_BEACON = 6; //同步
+	VN_DUTY_SYNC = 7; //同步
+
+}
+
+message VNode{
+	string 		bcuid = 1;//节点
+	string 		co_address = 2;//拥有合约cws的地址, 联合账户地址
+	VNodeState	state = 3;		//@see VNodeState
+	int32 		cur_block = 4;	//Block高度
+	int64		cur_block_recv_time = 5;//收到当前区块时候的时间戳
+	int64		cur_block_make_time = 6;//收到当前区块时候的时间戳
+	string		cur_block_hash = 7;//当前blockhash
+	string		prev_block_hash = 8;//当前blockhash
+	int32		bit_idx = 9;//bitidx;
+	string 		vrf_randseeds = 10;
+	string		vrf_codes = 11;//
+	string		vrf_groups = 12;//
+	string		beacon_hash = 13;//
+	string		beacon_sign = 14;//
+	bool        do_mine = 15;
+	string 		authBalance = 16;
+	string		cominers = 17;//cominer bits
+	int64		last_begin_miner_time = 18;
+	string		cur_block_miner_coaddr = 19;
+}
+
+message GossipMiner{
+	string	bcuid = 1;
+	int32	cur_block = 2 ;
+	string	cur_block_hash = 3;
+	string	beacon_hash = 4;
+	string  block_extr_data = 5;
+	string	cur_block_miner_coaddr = 6;
+}
+
+//块认证者
+message BlockWitnessInfo{
+    int64 blockheight = 1; // 产出高度
+    string beacon_hash = 2; // beaconHash,父块hash
+    string  netbitx = 3; // 网络节点分布
+    repeated VNode witness = 10; // 见证者
+}
+
+//获取本地节点信息
+message PSNodeInfo{
+	string req_token = 1;//是否获取拓扑信息
+	VNode 	vn = 3;//交换一下我自己的节点信息
+	repeated GossipMiner murs = 4;
+	bool   is_query = 5;
+	int32  sugguest_start_sync_block_id = 6;
+	int32	gossip_block_info = 7;//请求某一个块的信息
+	GossipMiner gossip_miner_info = 8; //返回某个块的信息
+	string message_id = 30;
+}
+
+//节点退出
+message PSNodeGraceShutDown{
+	string  reason = 1;
+}
+
+
+message PRetNodeInfo{
+	int32 ret_code = 1;//返回
+	string ret_message = 2;//返回信息
+
+	VNode 	vn = 3;//交换一下我自己的节点信息
+	int64	queue_bsbatch = 4; //待打块数量
+	int64	queue_confirm = 5; //待确认交易数量
+	int64	queue_wall = 6;    //待广播交易数量
+	string	extinfo = 7;
+
+	repeated  GossipMiner  murs = 8;
+
+	string 	message_id = 30;
+	string 	sign = 100;//对上述数据的签名结果
+}
+
+//PSCoinbase新块
+message  PSCoinbase{
+	string 	beacon_hash = 1;	//
+	string  beacon_sign = 2;
+	string 	prev_beacon_hash = 3; //上次term的uid
+	bytes	block_seeds  = 4;
+	bytes 	prev_block_seeds  = 5; //上次term的id
+	bytes	vrf_codes = 6;//
+	string 	co_address = 7;	//联合账户地址
+	int64 	rewards = 8;//cws手续费
+	int32	block_height = 9;//块高
+	int64 	cws_guaranty = 10;//保证金
+
+	int32	slice_id = 11;	     //分片
+
+	string	group_bits = 12;//
+	string 	beacon_bits = 13;//
+	string	witness_bits = 14;//
+
+	string 	bcuid = 15;			//节点
+
+	int64	block_mine_time = 16;		 //出块时间戳
+	int32	txcount = 17;		 //交易数量
+	PBlockEntry block_entry = 18;//块体
+	repeated bytes txbodies = 19; //交易体
+	enum	ApplyStatus{
+		APPLY_OK = 0;
+		APPLY_OK_LOW_MEMORY = 1;
+		APPLY_NOT_CONTINUE = 2;
+		APPLY_REJECT = 3;
+
+	}
+	ApplyStatus	apply_status = 20;//区块apply的返回状态
+	string 	message_id = 30;
+}
+
+//notary新块
+message  PSNotary{
+	int32	block_height = 1;//块高
+	int64 	block_hash = 2;//
+	string  beacon_sign = 3;
+	enum PVoteResult{
+		VR_CONFIRM = 0;
+		VR_REJECT = 1;
+	}
+	PVoteResult	blk_voteresult  = 4;
+}
+
+//查询notary信息
+message  PQNotary{
+	int32	block_height = 1;//块高
+	string	block_hash = 2;
+	string  beacon_sign = 3;
+}
+
+
+message PBlockEntry{
+	int32 	block_height = 1;	//块高
+	string 	coinbase_bcuid = 2; //打块节点ID
+	int32	slice_id = 3;		//分片
+	string	blockhash = 4;
+
+	bytes	block_header = 10;	//Block对象
+	bytes 	block_miner = 11;   //Miner
+	string 	sign = 50;
+}
+
+
+message PSSyncBlocks{
+	int32 	start_id = 1;	//一般是取0
+	int32	end_id = 2;	    //分页截至
+	bool needBody = 3;	
+	repeated int32 block_idx = 4;//byids
+	string signature = 5;
+	int32	max_height = 6;//最大高度
+	string message_id = 30;
+	
+//	VNode 	vn = 1;			//获取信息
+//	message BlockHashInfo{
+//		int32	block_height = 1;
+//		string  block_hash = 2;
+//	}
+//	repeated BlockHashInfo  block_infos = 5;
+//	int32	sync_block_count = 6;//
+
+//	string 	bcuid = 10;		//节点Id
+
+
+//	enum QueryMode {
+//		QM_RANGE = 0;//根据startid和endid查询
+//		QM_BLOCK_IDX = 1;//根据block的id列表查询
+//		QM_BLOCK_HEIGHT = 2;//根据区块高度
+//		QM_BLOCK_HASH = 3;//根据hash列表找到一个合适的为止
+//	}
+}
+
+message PRetSyncBlocks{
+	int32 ret_code = 1;
+	string ret_message = 2;
+	repeated PBlockEntry block_headers = 3;
+	string message_id = 30;
+	string 		bcuid = 10;		//节点Id
+}
+
+message PSSyncTransaction {
+	//repeated string txHexStr = 1;
+	repeated bytes txHash = 1;	//Tx
+	repeated bytes txDatas = 2; //Tx Data
+	string messageid = 3;
+	enum SyncType{
+		ST_WALLOUT = 0;			//待广播
+		ST_CONFIRM_RECV = 1;	//确认官博
+		ST_INBLOCK = 2;			//已经入块
+	}
+	SyncType syncType = 4;
+	string from_bcuid = 5;		//交易发起节点ID
+	string confirm_bcuid = 6;	//交易确认节点ID
+}
+
+message PRetSyncTransaction {
+	int32 ret_code = 1;
+	string ret_message = 2;
+}
+
+message PSGetTransaction {
+	repeated string txHash = 1;
+}
+
+message PRetGetTransaction {
+	int32 ret_code = 1;
+	string ret_message = 2;
+	repeated bytes txContent = 3;
+}
+
+
+
+message PSRhrCheck{//心跳检查
+	string reqinfo = 1;
+}
+
+message PRetRhrCheck{//加入的返回信息
+	int32 ret_code = 1;		//返回
+	string ret_message = 2; //返回信息
+	int64	blockheight = 3;//块高
+	int64	termid = 4;		//TermID
+	int64 	lastblocktime = 5;//最后打块时间
+	int64	maxblockheightseen = 6;//全网中找到的最大块号
+	int64	maxtermidseedn = 7;	   //全网中找到的最大termid
+	string	blockhash = 9;		   //blockHash
+	string	coaddr = 10;		   //联合账户地址
+	string	status = 11;		   //'Pending,cominer...'
+	int64	timepasslastblk = 12;  //上次新块的时间戳
+	int32	banforvote = 13;	   //禁止投票的时间（秒）
+	string 	beacon_hash = 14;	//
+}
+
+//节点信息
+message PRetHealthCheck {
+    int32 ret_code = 1; //返回
+    string ret_message = 2; //返回信息
+    VNode cn_node = 3; // net_id
+    string pending_node = 13; //coMiner
+    string direct_node = 14; //coMiner
+    repeated VNode coMiners = 15; //coMiner
+	int32 confirm_tx = 17;
+	int32 dbsave_tx = 18;
+	int32 syncblock_tx = 19;
+	int32 wall_tx = 20;
+}
